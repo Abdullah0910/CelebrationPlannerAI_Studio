@@ -13,6 +13,8 @@ import { ExpenseModal } from './components/ExpenseModal';
 import { GuestModal } from './components/GuestModal';
 import { TaskModal } from './components/TaskModal';
 import { ConfirmModal } from './components/ConfirmModal';
+import { EventDetailModal } from './components/EventDetailModal';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 import { EventItem, ExpenseItem, GuestItem, TaskItem } from './types';
 
@@ -47,6 +49,9 @@ const MainLayout: React.FC = () => {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<TaskItem | null>(null);
 
+  const [inspectingEvent, setInspectingEvent] = useState<EventItem | null>(null);
+  const [isEventDetailModalOpen, setIsEventDetailModalOpen] = useState(false);
+
   const [deleteConfirmation, setDeleteConfirmation] = useState<{
     isOpen: boolean;
     type: 'event' | 'expense' | 'guest' | 'task';
@@ -68,6 +73,11 @@ const MainLayout: React.FC = () => {
   const handleEditEvent = (event: EventItem) => {
     setEventToEdit(event);
     setIsEventModalOpen(true);
+  };
+
+  const handleInspectEvent = (event: EventItem) => {
+    setInspectingEvent(event);
+    setIsEventDetailModalOpen(true);
   };
 
   const handlePromptDeleteEvent = (id: string) => {
@@ -164,6 +174,7 @@ const MainLayout: React.FC = () => {
             onOpenAddExpense={handleOpenAddExpense}
             onOpenAddGuest={handleOpenAddGuest}
             onOpenAddTask={handleOpenAddTask}
+            onInspectEvent={handleInspectEvent}
           />
         )}
 
@@ -172,6 +183,7 @@ const MainLayout: React.FC = () => {
             onOpenCreateEvent={handleOpenCreateEvent}
             onEditEvent={handleEditEvent}
             onDeleteEvent={handlePromptDeleteEvent}
+            onInspectEvent={handleInspectEvent}
           />
         )}
 
@@ -203,6 +215,7 @@ const MainLayout: React.FC = () => {
           <CalendarView
             onOpenCreateEvent={handleOpenCreateEvent}
             onOpenAddTask={handleOpenAddTask}
+            onInspectEvent={handleInspectEvent}
           />
         )}
 
@@ -229,6 +242,19 @@ const MainLayout: React.FC = () => {
             addEvent(data);
           }
         }}
+      />
+
+      <EventDetailModal
+        isOpen={isEventDetailModalOpen}
+        event={inspectingEvent ? (events.find((e) => e.id === inspectingEvent.id) || inspectingEvent) : null}
+        onClose={() => setIsEventDetailModalOpen(false)}
+        onEdit={(evt) => {
+          setIsEventDetailModalOpen(false);
+          handleEditEvent(evt);
+        }}
+        onOpenAddExpense={handleOpenAddExpense}
+        onOpenAddGuest={handleOpenAddGuest}
+        onOpenAddTask={handleOpenAddTask}
       />
 
       <ExpenseModal
@@ -289,8 +315,10 @@ const MainLayout: React.FC = () => {
 
 export default function App() {
   return (
-    <EventPlannerProvider>
-      <MainLayout />
-    </EventPlannerProvider>
+    <ErrorBoundary>
+      <EventPlannerProvider>
+        <MainLayout />
+      </EventPlannerProvider>
+    </ErrorBoundary>
   );
 }

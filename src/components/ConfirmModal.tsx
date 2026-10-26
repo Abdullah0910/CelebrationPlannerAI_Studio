@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 
 interface ConfirmModalProps {
@@ -22,6 +22,15 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onCancel();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onCancel]);
+
   if (!isOpen) return null;
 
   return (
@@ -37,7 +46,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <div className={`p-2.5 rounded-xl ${isDestructive ? 'bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400'}`}>
               <AlertTriangle className="w-5 h-5" />
             </div>
-            <h2 id="confirm-modal-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <h2 id="confirm-modal-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100 font-display">
               {title}
             </h2>
           </div>

@@ -15,7 +15,7 @@ import {
   PieChart,
 } from 'lucide-react';
 import { useEventPlanner } from '../context/EventPlannerContext';
-import { ExpenseCategory, ExpenseItem } from '../types';
+import { ExpenseCategoryFilter, ExpenseItem, PaymentStatusFilter } from '../types';
 import {
   calculateBudgetSummary,
   formatCurrency,
@@ -29,7 +29,7 @@ interface BudgetViewProps {
   onDeleteExpense: (id: string) => void;
 }
 
-const CATEGORIES: ('All' | ExpenseCategory)[] = [
+const CATEGORIES: ExpenseCategoryFilter[] = [
   'All',
   'Venue',
   'Catering',
@@ -40,6 +40,12 @@ const CATEGORIES: ('All' | ExpenseCategory)[] = [
   'Invitations & Favors',
   'Transportation & Logistics',
   'Miscellaneous',
+];
+
+const PAYMENT_OPTIONS: { value: PaymentStatusFilter; label: string }[] = [
+  { value: 'all', label: 'All Payments' },
+  { value: 'paid', label: 'Paid in Full' },
+  { value: 'unpaid', label: 'Balance Due' },
 ];
 
 export const BudgetView: React.FC<BudgetViewProps> = ({
@@ -57,8 +63,8 @@ export const BudgetView: React.FC<BudgetViewProps> = ({
 
   const themeCfg = THEME_CONFIGS[theme];
 
-  const [categoryFilter, setCategoryFilter] = useState<'All' | ExpenseCategory>('All');
-  const [paymentFilter, setPaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<ExpenseCategoryFilter>('All');
+  const [paymentFilter, setPaymentFilter] = useState<PaymentStatusFilter>('all');
   const [search, setSearch] = useState('');
 
   // Selected event or all
@@ -101,6 +107,7 @@ export const BudgetView: React.FC<BudgetViewProps> = ({
 
         <div className="flex items-center gap-3">
           <select
+            aria-label="Filter budget by event"
             value={selectedEventId}
             onChange={(e) => setSelectedEventId(e.target.value)}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
@@ -241,7 +248,7 @@ export const BudgetView: React.FC<BudgetViewProps> = ({
       </div>
 
       {/* Filter and Search Bar for Ledger */}
-      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="relative flex-1">
             <input
@@ -255,15 +262,18 @@ export const BudgetView: React.FC<BudgetViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Payment:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Payment:</span>
             <select
+              aria-label="Filter expenses by payment status"
               value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value as any)}
-              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden capitalize"
+              onChange={(e) => setPaymentFilter(e.target.value as PaymentStatusFilter)}
+              className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
             >
-              <option value="all">All Payments</option>
-              <option value="paid">Paid in Full</option>
-              <option value="unpaid">Balance Due</option>
+              {PAYMENT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>

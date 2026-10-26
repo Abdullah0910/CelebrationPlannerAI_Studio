@@ -16,7 +16,7 @@ import {
   Send,
 } from 'lucide-react';
 import { useEventPlanner } from '../context/EventPlannerContext';
-import { GuestGroup, GuestItem, RsvpStatus } from '../types';
+import { GuestGroupFilter, GuestItem, GuestRsvpFilter, RsvpStatus } from '../types';
 import { calculateGuestSummary } from '../utils/eventCalculations';
 import { THEME_CONFIGS } from '../types/theme';
 
@@ -26,8 +26,8 @@ interface GuestsViewProps {
   onDeleteGuest: (id: string) => void;
 }
 
-const GROUPS: ('All' | GuestGroup)[] = ['All', 'Family', 'Friends', 'VIP', 'Colleagues', 'Vendors'];
-const RSVP_FILTERS: ('All' | RsvpStatus)[] = ['All', 'Attending', 'Pending', 'Tentative', 'Declined'];
+const GROUPS: GuestGroupFilter[] = ['All', 'Family', 'Friends', 'VIP', 'Colleagues', 'Vendors'];
+const RSVP_FILTERS: GuestRsvpFilter[] = ['All', 'Attending', 'Pending', 'Tentative', 'Declined'];
 
 export const GuestsView: React.FC<GuestsViewProps> = ({
   onOpenAddGuest,
@@ -45,8 +45,8 @@ export const GuestsView: React.FC<GuestsViewProps> = ({
 
   const themeCfg = THEME_CONFIGS[theme];
 
-  const [groupFilter, setGroupFilter] = useState<'All' | GuestGroup>('All');
-  const [rsvpFilter, setRsvpFilter] = useState<'All' | RsvpStatus>('All');
+  const [groupFilter, setGroupFilter] = useState<GuestGroupFilter>('All');
+  const [rsvpFilter, setRsvpFilter] = useState<GuestRsvpFilter>('All');
   const [search, setSearch] = useState('');
 
   const activeEvent = events.find((e) => e.id === selectedEventId);
@@ -84,6 +84,7 @@ export const GuestsView: React.FC<GuestsViewProps> = ({
 
         <div className="flex items-center gap-3">
           <select
+            aria-label="Filter guests by event"
             value={selectedEventId}
             onChange={(e) => setSelectedEventId(e.target.value)}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
@@ -166,7 +167,7 @@ export const GuestsView: React.FC<GuestsViewProps> = ({
       </div>
 
       {/* Dietary Summary Banner */}
-      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs shadow-xs">
         <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 font-medium">
           <Utensils className="w-4 h-4 text-amber-500 shrink-0" />
           <span>Dietary Requirements Summary for Catering:</span>
@@ -187,7 +188,7 @@ export const GuestsView: React.FC<GuestsViewProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="relative flex-1">
             <input
@@ -201,10 +202,11 @@ export const GuestsView: React.FC<GuestsViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">RSVP:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">RSVP:</span>
             <select
+              aria-label="Filter guests by RSVP response"
               value={rsvpFilter}
-              onChange={(e) => setRsvpFilter(e.target.value as any)}
+              onChange={(e) => setRsvpFilter(e.target.value as GuestRsvpFilter)}
               className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
             >
               {RSVP_FILTERS.map((rf) => (

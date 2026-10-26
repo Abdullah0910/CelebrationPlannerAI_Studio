@@ -80,7 +80,8 @@ A modern, responsive Celebration & Event Planner web application built with Reac
 │   ├── components/
 │   │   ├── Navbar.tsx            # Top Bar Contract compliant navigation
 │   │   ├── DashboardView.tsx     # Celebration overview & operational KPIs
-│   │   ├── EventsView.tsx        # Event hub (grid & list view with filters)
+│   │   ├── EventsView.tsx        # Event hub (grid & list view with date filters)
+│   │   ├── EventDetailModal.tsx  # Dedicated Celebration Hub modal (overview, budget, guests, tasks)
 │   │   ├── BudgetView.tsx        # Financial allocations & expense ledger
 │   │   ├── GuestsView.tsx        # Guest attendee list & RSVP management
 │   │   ├── TasksView.tsx         # Checklists, milestones & task tracking
@@ -91,6 +92,7 @@ A modern, responsive Celebration & Event Planner web application built with Reac
 │   │   ├── GuestModal.tsx        # Guest invitation & dietary dialog
 │   │   ├── TaskModal.tsx         # Checklist item scheduling dialog
 │   │   ├── ConfirmModal.tsx      # Accessible confirmation dialogs
+│   │   ├── ErrorBoundary.tsx     # Graceful error recovery boundary
 │   │   └── Toast.tsx             # Notification toast alerts
 │   ├── context/
 │   │   └── EventPlannerContext.tsx # Centralized state & LocalStorage engine
@@ -98,14 +100,17 @@ A modern, responsive Celebration & Event Planner web application built with Reac
 │   │   └── initialData.ts        # Realistic pre-populated celebrations
 │   ├── tests/
 │   │   ├── eventCalculations.test.ts # Math, budget & RSVP calculations
+│   │   ├── budgetEdgeCases.test.ts   # Zero budget, precision rounding & safety tests
+│   │   ├── eventFiltering.test.ts    # Date range filters & boundary conditions
+│   │   ├── schemaValidation.test.ts  # JSON backup structure & corruption validation
 │   │   ├── validation.test.ts        # Form input validation rules
-│   │   └── dataPersistence.test.ts   # Backup serialization tests
+│   │   └── dataPersistence.test.ts   # Backup serialization & LocalStorage tests
 │   ├── types/
-│   │   ├── index.ts              # Core TypeScript interfaces & types
+│   │   ├── index.ts              # Core TypeScript interfaces & strict filter types
 │   │   └── theme.ts              # Celebration theme presets
 │   ├── utils/
 │   │   └── eventCalculations.ts  # Domain math, countdown & validation helpers
-│   ├── App.tsx                   # Main application layout
+│   ├── App.tsx                   # Main application layout & modal coordination
 │   ├── main.tsx                  # Application entry point
 │   └── index.css                 # Global styling, fonts & scrollbars
 ├── index.html                    # HTML shell & font preconnect
@@ -167,5 +172,14 @@ npm run build
 
 - **Zero-Pill Anti-Slop Discipline**: Metadata is presented cleanly with typographic separators (`·`), avoiding cluttered badge sandwiches.
 - **Tabular Figures**: All financial figures and timestamps use `tabular-nums` for crisp vertical column alignment.
-- **Accessible Forms**: Inputs feature semantic `<label>` associations, visible focus rings, and explicit validation feedback.
-- **Safe JSON Imports**: Exported backups validate structure before updating state to prevent data corruption.
+- **Accessible Forms**: Inputs feature semantic `<label>` associations, visible focus rings, ARIA error linking, and Escape key dismissal on all dialogs.
+- **Strict JSON Imports**: Exported backups validate structure and schema constraints via `validateBackupSchema` before updating state to prevent corrupted payload injection.
+- **DST-Resilient Time Calculation**: All date arithmetic relies on normalized UTC whole calendar day math, avoiding daylight saving hour shift discrepancies.
+
+---
+
+## 📌 Known Limitations
+
+1. **Client-Side Storage Scope**: LocalStorage persistence is scoped to the browser client and origin. For multi-user concurrent editing or team collaboration across devices, a remote backend (such as Cloud Firestore or PostgreSQL) would be required.
+2. **Email Dispatch**: Guest invitation emails and RSVP status notifications are tracked within the planner application; native automated SMTP or transactional email delivery requires external email service provider integration.
+3. **Receipt Image Attachments**: Expense receipts are stored as note references and links; multi-megabyte binary file storage is currently kept lightweight to respect browser quota limits.

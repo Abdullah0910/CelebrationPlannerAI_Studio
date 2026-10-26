@@ -7,7 +7,7 @@ import {
   InvitationStatus,
   RsvpStatus,
 } from '../types';
-import { validateGuestInput } from '../utils/eventCalculations';
+import { parseSafeNumber, validateGuestInput } from '../utils/eventCalculations';
 import { useEventPlanner } from '../context/EventPlannerContext';
 import { THEME_CONFIGS } from '../types/theme';
 
@@ -57,6 +57,16 @@ export const GuestModal: React.FC<GuestModalProps> = ({
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (guestToEdit) {
       setEventId(guestToEdit.eventId);
@@ -105,7 +115,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       invitationStatus,
       dietary,
       dietaryNotes: dietaryNotes || undefined,
-      plusOnes: Number(plusOnes) || 0,
+      plusOnes: parseSafeNumber(plusOnes, 0, 0),
       tableNumber: tableNumber || undefined,
       notes: notes || undefined,
     };
@@ -125,7 +135,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="guest-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
     >
       <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl my-8 overflow-hidden">
         {/* Header */}
@@ -151,10 +161,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           {/* Event Selection */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="guest-event-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Celebration Event <span className="text-rose-500">*</span>
             </label>
             <select
+              id="guest-event-select"
               value={eventId}
               onChange={(e) => setEventId(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -169,12 +180,15 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
           {/* Guest Name */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="guest-name-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Full Name <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <input
+                id="guest-name-input"
                 type="text"
+                aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? 'guest-name-error' : undefined}
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
@@ -185,18 +199,21 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               />
               <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
             </div>
-            {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name}</p>}
+            {errors.name && <p id="guest-name-error" className="mt-1 text-xs text-rose-500">{errors.name}</p>}
           </div>
 
           {/* Email & Phone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-email-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Email Address
               </label>
               <div className="relative">
                 <input
+                  id="guest-email-input"
                   type="email"
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? 'guest-email-error' : undefined}
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -207,15 +224,16 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 />
                 <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
               </div>
-              {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email}</p>}
+              {errors.email && <p id="guest-email-error" className="mt-1 text-xs text-rose-500">{errors.email}</p>}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-phone-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Phone Number
               </label>
               <div className="relative">
                 <input
+                  id="guest-phone-input"
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
@@ -230,11 +248,12 @@ export const GuestModal: React.FC<GuestModalProps> = ({
           {/* Group & RSVP Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-group-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Guest Group
               </label>
               <div className="relative">
                 <select
+                  id="guest-group-select"
                   value={group}
                   onChange={(e) => setGroup(e.target.value as GuestGroup)}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -250,10 +269,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-rsvp-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 RSVP Response
               </label>
               <select
+                id="guest-rsvp-select"
                 value={rsvpStatus}
                 onChange={(e) => setRsvpStatus(e.target.value as RsvpStatus)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -270,24 +290,26 @@ export const GuestModal: React.FC<GuestModalProps> = ({
           {/* Plus Ones & Table */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-plus-ones-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Plus Ones (+Guests)
               </label>
               <input
+                id="guest-plus-ones-input"
                 type="number"
                 min="0"
                 max="10"
-                value={plusOnes}
-                onChange={(e) => setPlusOnes(Number(e.target.value))}
+                value={plusOnes || ''}
+                onChange={(e) => setPlusOnes(parseSafeNumber(e.target.value, 0, 0))}
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-invitation-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Invitation Status
               </label>
               <select
+                id="guest-invitation-select"
                 value={invitationStatus}
                 onChange={(e) => setInvitationStatus(e.target.value as InvitationStatus)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -301,11 +323,12 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-table-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Table Assignment
               </label>
               <div className="relative">
                 <input
+                  id="guest-table-input"
                   type="text"
                   value={tableNumber}
                   onChange={(e) => setTableNumber(e.target.value)}
@@ -320,11 +343,12 @@ export const GuestModal: React.FC<GuestModalProps> = ({
           {/* Dietary Requirements */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-dietary-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Dietary Preference
               </label>
               <div className="relative">
                 <select
+                  id="guest-dietary-select"
                   value={dietary}
                   onChange={(e) => setDietary(e.target.value as DietaryRequirement)}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -340,10 +364,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="guest-dietary-notes" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Dietary / Allergy Details
               </label>
               <input
+                id="guest-dietary-notes"
                 type="text"
                 value={dietaryNotes}
                 onChange={(e) => setDietaryNotes(e.target.value)}
@@ -355,10 +380,11 @@ export const GuestModal: React.FC<GuestModalProps> = ({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="guest-notes-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Guest Notes
             </label>
             <textarea
+              id="guest-notes-input"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

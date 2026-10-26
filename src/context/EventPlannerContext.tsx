@@ -14,6 +14,7 @@ import {
   TaskItem,
   ThemePreset,
 } from '../types';
+import { validateBackupSchema } from '../utils/eventCalculations';
 
 interface NotificationState {
   type: 'success' | 'error' | 'info';
@@ -71,6 +72,13 @@ interface EventPlannerContextType {
 }
 
 const STORAGE_KEY_PREFIX = 'celebration_planner_v1_';
+
+function generateId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+}
 
 const EventPlannerContext = createContext<EventPlannerContextType | undefined>(undefined);
 
@@ -219,7 +227,7 @@ export const EventPlannerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const now = new Date().toISOString();
     const newEvent: EventItem = {
       ...eventData,
-      id: `evt-${Date.now()}`,
+      id: generateId('evt'),
       createdAt: now,
       updatedAt: now,
     };
@@ -257,7 +265,7 @@ export const EventPlannerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const addExpense = (expenseData: Omit<ExpenseItem, 'id'>): ExpenseItem => {
     const newExpense: ExpenseItem = {
       ...expenseData,
-      id: `exp-${Date.now()}`,
+      id: generateId('exp'),
     };
     setExpenses((prev) => [newExpense, ...prev]);
     notify('success', `Added expense: "${newExpense.name}"`);
@@ -280,7 +288,7 @@ export const EventPlannerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const addGuest = (guestData: Omit<GuestItem, 'id'>): GuestItem => {
     const newGuest: GuestItem = {
       ...guestData,
-      id: `gst-${Date.now()}`,
+      id: generateId('gst'),
     };
     setGuests((prev) => [newGuest, ...prev]);
     notify('success', `Added guest: ${newGuest.name}`);
@@ -310,7 +318,7 @@ export const EventPlannerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const addTask = (taskData: Omit<TaskItem, 'id'>): TaskItem => {
     const newTask: TaskItem = {
       ...taskData,
-      id: `tsk-${Date.now()}`,
+      id: generateId('tsk'),
     };
     setTasks((prev) => [newTask, ...prev]);
     notify('success', `Added task: "${newTask.title}"`);
@@ -354,20 +362,23 @@ export const EventPlannerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const importData = (jsonStr: string): { success: boolean; message: string } => {
     try {
       const parsed = JSON.parse(jsonStr);
-      if (!Array.isArray(parsed.events)) {
-        return { success: false, message: 'Invalid backup format: missing events list.' };
+      const schemaCheck = validateBackupSchema(parsed);
+      if (!schemaCheck.isValid) {
+        return { success: false, message: schemaCheck.error || 'Invalid backup schema structure.' };
       }
 
       setEvents(parsed.events);
       if (Array.isArray(parsed.expenses)) setExpenses(parsed.expenses);
       if (Array.isArray(parsed.guests)) setGuests(parsed.guests);
       if (Array.isArray(parsed.tasks)) setTasks(parsed.tasks);
-      if (parsed.theme) setTheme(parsed.theme);
+      if (parsed.theme && ['gold', 'rose', 'indigo', 'emerald', 'noir'].includes(parsed.theme)) {
+        setTheme(parsed.theme as ThemePreset);
+      }
 
       notify('success', 'Data successfully restored from backup.');
       return { success: true, message: 'Data successfully restored.' };
     } catch {
-      return { success: false, message: 'Failed to parse JSON file. Please check file format.' };
+      return { success: false, message: 'Failed to parse JSON file. Please ensure it is valid JSON.' };
     }
   };
 

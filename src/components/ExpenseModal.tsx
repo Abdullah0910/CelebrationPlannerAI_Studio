@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, Calendar, Tag, Briefcase } from 'lucide-react';
 import { ExpenseCategory, ExpenseItem } from '../types';
-import { validateExpenseInput } from '../utils/eventCalculations';
+import { parseSafeNumber, validateExpenseInput } from '../utils/eventCalculations';
 import { useEventPlanner } from '../context/EventPlannerContext';
 import { THEME_CONFIGS } from '../types/theme';
 
@@ -47,6 +47,16 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Escape key handler
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (expenseToEdit) {
       setEventId(expenseToEdit.eventId);
@@ -88,14 +98,17 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const actual = parseSafeNumber(actualCost, 0, 0);
+    const paid = parseSafeNumber(paidAmount, 0, 0);
+
     const payload = {
       eventId: eventId || events[0]?.id || '',
       name,
       category,
-      estimatedCost: Number(estimatedCost) || 0,
-      actualCost: Number(actualCost) || 0,
-      paidAmount: Number(paidAmount) || 0,
-      isPaid: Boolean(isPaid || (Number(paidAmount) >= Number(actualCost) && Number(actualCost) > 0)),
+      estimatedCost: parseSafeNumber(estimatedCost, 0, 0),
+      actualCost: actual,
+      paidAmount: paid,
+      isPaid: Boolean(isPaid || (paid >= actual && actual > 0)),
       dueDate: dueDate || undefined,
       vendor: vendor || undefined,
       notes: notes || undefined,
@@ -116,7 +129,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="expense-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
     >
       <div className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl my-8 overflow-hidden">
         {/* Header */}
@@ -142,10 +155,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
           {/* Event Selection */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="expense-event-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Celebration Event <span className="text-rose-500">*</span>
             </label>
             <select
+              id="expense-event-select"
               value={eventId}
               onChange={(e) => setEventId(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -160,11 +174,14 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
 
           {/* Expense Name */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="expense-name-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Expense Item <span className="text-rose-500">*</span>
             </label>
             <input
+              id="expense-name-input"
               type="text"
+              aria-invalid={!!errors.name}
+              aria-describedby={errors.name ? 'expense-name-error' : undefined}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
@@ -173,17 +190,18 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
               placeholder="e.g. Wedding Cake Tiered Tasting & Delivery"
               className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:border-slate-500 focus:outline-hidden"
             />
-            {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name}</p>}
+            {errors.name && <p id="expense-name-error" className="mt-1 text-xs text-rose-500">{errors.name}</p>}
           </div>
 
           {/* Category & Vendor */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="expense-category-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Category
               </label>
               <div className="relative">
                 <select
+                  id="expense-category-select"
                   value={category}
                   onChange={(e) => setCategory(e.target.value as ExpenseCategory)}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -199,11 +217,12 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="expense-vendor-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Vendor / Supplier
               </label>
               <div className="relative">
                 <input
+                  id="expense-vendor-input"
                   type="text"
                   value={vendor}
                   onChange={(e) => setVendor(e.target.value)}
@@ -218,16 +237,17 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
           {/* Financials: Estimated vs Actual */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="expense-estimated-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Estimated Cost ($)
               </label>
               <div className="relative">
                 <input
+                  id="expense-estimated-input"
                   type="number"
                   min="0"
                   step="10"
-                  value={estimatedCost}
-                  onChange={(e) => setEstimatedCost(Number(e.target.value))}
+                  value={estimatedCost || ''}
+                  onChange={(e) => setEstimatedCost(parseSafeNumber(e.target.value, 0, 0))}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
                 />
                 <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -235,41 +255,45 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="expense-actual-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Actual Cost ($) <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
+                  id="expense-actual-input"
                   type="number"
                   min="0"
                   step="10"
-                  value={actualCost}
+                  aria-invalid={!!errors.actualCost}
+                  aria-describedby={errors.actualCost ? 'expense-actual-error' : undefined}
+                  value={actualCost || ''}
                   onChange={(e) => {
-                    setActualCost(Number(e.target.value));
+                    setActualCost(parseSafeNumber(e.target.value, 0, 0));
                     if (errors.actualCost) setErrors((prev) => ({ ...prev, actualCost: '' }));
                   }}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
                 />
                 <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
               </div>
-              {errors.actualCost && <p className="mt-1 text-xs text-rose-500">{errors.actualCost}</p>}
+              {errors.actualCost && <p id="expense-actual-error" className="mt-1 text-xs text-rose-500">{errors.actualCost}</p>}
             </div>
           </div>
 
           {/* Payment Status & Amount Paid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="expense-paid-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Amount Paid So Far ($)
               </label>
               <div className="relative">
                 <input
+                  id="expense-paid-input"
                   type="number"
                   min="0"
                   step="10"
-                  value={paidAmount}
+                  value={paidAmount || ''}
                   onChange={(e) => {
-                    const val = Number(e.target.value);
+                    const val = parseSafeNumber(e.target.value, 0, 0);
                     setPaidAmount(val);
                     if (val >= actualCost && actualCost > 0) {
                       setIsPaid(true);
@@ -282,11 +306,12 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="expense-due-date-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Due Date (if unpaid)
               </label>
               <div className="relative">
                 <input
+                  id="expense-due-date-input"
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
@@ -313,10 +338,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="expense-notes-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Notes & Contract Terms
             </label>
             <textarea
+              id="expense-notes-input"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

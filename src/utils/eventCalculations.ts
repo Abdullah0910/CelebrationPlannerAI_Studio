@@ -1,4 +1,5 @@
 import {
+  DateFilterOption,
   DietaryRequirement,
   EventItem,
   ExpenseCategory,
@@ -36,10 +37,10 @@ export interface GuestSummary {
   declined: number;
   tentative: number;
   pending: number;
-  totalHeadcount: number; // Includes guest + their plus-ones for attending
-  potentialHeadcount: number; // Includes attending + tentative + plus-ones
-  rsvpRate: number; // Percentage of guests who gave any response
-  attendingRate: number; // Percentage of responded who are attending
+  totalHeadcount: number;
+  potentialHeadcount: number;
+  rsvpRate: number;
+  attendingRate: number;
   dietaryBreakdown: Record<DietaryRequirement, number>;
   groupBreakdown: Record<GuestGroup, number>;
 }
@@ -55,21 +56,109 @@ export interface TaskSummary {
   highPriorityPending: number;
 }
 
+/**
+ * Safe numeric parser with minimum bounds protection.
+ */
+export function parseSafeNumber(val: unknown, fallback = 0, min?: number): number {
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num) || !isFinite(num)) {
+    return min !== undefined ? Math.max(min, fallback) : fallback;
+  }
+  return min !== undefined ? Math.max(min, num) : num;
+}
+
+/**
+ * Converts a YYYY-MM-DD string into a normalized UTC timestamp representing the start of that calendar day.
+ * Eliminates daylight saving time transitions and timezone drift.
+ */
+export function parseDateToUtc(dateStr: string): number {
+  if (!dateStr || typeof dateStr !== 'string') return NaN;
+  const parts = dateStr.trim().split('-');
+  if (parts.length !== 3) return NaN;
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return NaN;
+  return Date.UTC(year, month, day);
+}
+
+/**
+ * Calculate difference in whole calendar days between target date string and reference date.
+ * Fully DST-resilient and timezone-proof.
+ */
+export function getDaysUntil(dateStr: string, referenceDate = new Date()): number {
+  const targetUtc = parseDateToUtc(dateStr);
+  if (isNaN(targetUtc)) return 0;
+
+  const refUtc = Date.UTC(
+    referenceDate.getFullYear(),
+    referenceDate.getMonth(),
+    referenceDate.getDate()
+  );
+
+  const diffMs = targetUtc - refUtc;
+  const MS_PER_DAY = 86400000;
+  return Math.round(diffMs / MS_PER_DAY);
+}
+
+export function formatEventCountdown(dateStr: string, referenceDate = new Date()): string {
+  const days = getDaysUntil(dateStr, referenceDate);
+  if (days < 0) {
+    return `${Math.abs(days)}d ago`;
+  }
+  if (days === 0) {
+    return 'Today';
+  }
+  if (days === 1) {
+    return 'Tomorrow';
+  }
+  return `in ${days} days`;
+}
+
+export function formatCurrency(amount: number): string {
+  const safe = parseSafeNumber(amount, 0);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(safe);
+}
+
+export function formatDatePretty(dateStr: string): string {
+  if (!dateStr) return '';
+  const utc = parseDateToUtc(dateStr);
+  if (isNaN(utc)) return dateStr;
+
+  const parts = dateStr.split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  const d = new Date(year, month, day);
+
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(d);
+}
+
 export function calculateBudgetSummary(
   eventBudget: number,
   expenses: ExpenseItem[]
 ): BudgetSummary {
-  const totalBudget = Math.max(0, eventBudget || 0);
-  const totalEstimated = expenses.reduce((sum, item) => sum + (Number(item.estimatedCost) || 0), 0);
-  const totalActual = expenses.reduce((sum, item) => sum + (Number(item.actualCost) || 0), 0);
-  const totalPaid = expenses.reduce((sum, item) => sum + (Number(item.paidAmount) || 0), 0);
+  const totalBudget = parseSafeNumber(eventBudget, 0, 0);
+  const totalEstimated = expenses.reduce((sum, item) => sum + parseSafeNumber(item.estimatedCost, 0, 0), 0);
+  const totalActual = expenses.reduce((sum, item) => sum + parseSafeNumber(item.actualCost, 0, 0), 0);
+  const totalPaid = expenses.reduce((sum, item) => sum + parseSafeNumber(item.paidAmount, 0, 0), 0);
 
   const remainingBudget = totalBudget - totalActual;
-  const isOverBudget = totalActual > totalBudget && totalBudget > 0;
+  const isOverBudget = totalActual > totalBudget;
   const overspendingAmount = isOverBudget ? totalActual - totalBudget : 0;
   const unpaidBalance = Math.max(0, totalActual - totalPaid);
 
-  const spentPercentage = totalBudget > 0 ? Math.min(100, (totalActual / totalBudget) * 100) : 0;
+  const spentPercentage = totalBudget > 0 ? (totalActual / totalBudget) * 100 : (totalActual > 0 ? 100 : 0);
   const paidPercentage = totalActual > 0 ? Math.min(100, (totalPaid / totalActual) * 100) : 0;
 
   // Category breakdown
@@ -80,9 +169,9 @@ export function calculateBudgetSummary(
       categoryMap[item.category] = { estimated: 0, actual: 0, paid: 0, count: 0 };
     }
     const cat = categoryMap[item.category]!;
-    cat.estimated += Number(item.estimatedCost) || 0;
-    cat.actual += Number(item.actualCost) || 0;
-    cat.paid += Number(item.paidAmount) || 0;
+    cat.estimated += parseSafeNumber(item.estimatedCost, 0, 0);
+    cat.actual += parseSafeNumber(item.actualCost, 0, 0);
+    cat.paid += parseSafeNumber(item.paidAmount, 0, 0);
     cat.count += 1;
   });
 
@@ -139,13 +228,17 @@ export function calculateGuestSummary(guests: GuestItem[]): GuestSummary {
   };
 
   guests.forEach((guest) => {
-    // Dietary
-    dietaryBreakdown[guest.dietary] = (dietaryBreakdown[guest.dietary] || 0) + 1;
+    if (guest.dietary && dietaryBreakdown[guest.dietary] !== undefined) {
+      dietaryBreakdown[guest.dietary] += 1;
+    } else {
+      dietaryBreakdown.None += 1;
+    }
 
-    // Group
-    groupBreakdown[guest.group] = (groupBreakdown[guest.group] || 0) + 1;
+    if (guest.group && groupBreakdown[guest.group] !== undefined) {
+      groupBreakdown[guest.group] += 1;
+    }
 
-    const guestCount = 1 + (Number(guest.plusOnes) || 0);
+    const guestCount = 1 + parseSafeNumber(guest.plusOnes, 0, 0);
 
     switch (guest.rsvpStatus) {
       case 'Attending':
@@ -194,12 +287,6 @@ export function calculateTaskSummary(tasks: TaskItem[], referenceDate = new Date
   let dueThisWeek = 0;
   let highPriorityPending = 0;
 
-  const refDay = new Date(referenceDate);
-  refDay.setHours(0, 0, 0, 0);
-
-  const oneWeekAhead = new Date(refDay);
-  oneWeekAhead.setDate(oneWeekAhead.getDate() + 7);
-
   tasks.forEach((task) => {
     if (task.completed) {
       completed += 1;
@@ -212,14 +299,13 @@ export function calculateTaskSummary(tasks: TaskItem[], referenceDate = new Date
 
     if (!task.dueDate) return;
 
-    const taskDate = new Date(`${task.dueDate}T00:00:00`);
-    if (isNaN(taskDate.getTime())) return;
+    const daysUntil = getDaysUntil(task.dueDate, referenceDate);
 
-    if (taskDate < refDay) {
+    if (daysUntil < 0) {
       overdue += 1;
-    } else if (taskDate.getTime() === refDay.getTime()) {
+    } else if (daysUntil === 0) {
       dueToday += 1;
-    } else if (taskDate <= oneWeekAhead) {
+    } else if (daysUntil <= 7) {
       dueThisWeek += 1;
     }
   });
@@ -239,48 +325,40 @@ export function calculateTaskSummary(tasks: TaskItem[], referenceDate = new Date
   };
 }
 
-export function getDaysUntil(dateStr: string, referenceDate = new Date()): number {
-  const target = new Date(`${dateStr}T00:00:00`);
-  const ref = new Date(referenceDate);
-  ref.setHours(0, 0, 0, 0);
+/**
+ * Filter events by Date Filter option.
+ */
+export function filterEventsByDate(
+  events: EventItem[],
+  dateOption: DateFilterOption,
+  referenceDate = new Date()
+): EventItem[] {
+  if (dateOption === 'All' || dateOption === 'all') return events;
 
-  const diffTime = target.getTime() - ref.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
+  const currentYear = referenceDate.getFullYear();
+  const currentMonth = referenceDate.getMonth(); // 0-indexed
 
-export function formatEventCountdown(dateStr: string, referenceDate = new Date()): string {
-  const days = getDaysUntil(dateStr, referenceDate);
-  if (days < 0) {
-    return `${Math.abs(days)}d ago`;
-  }
-  if (days === 0) {
-    return 'Today';
-  }
-  if (days === 1) {
-    return 'Tomorrow';
-  }
-  return `in ${days} days`;
-}
+  return events.filter((evt) => {
+    const daysUntil = getDaysUntil(evt.date, referenceDate);
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount || 0);
-}
-
-export function formatDatePretty(dateStr: string): string {
-  if (!dateStr) return '';
-  const date = new Date(`${dateStr}T00:00:00`);
-  if (isNaN(date.getTime())) return dateStr;
-  return new Intl.DateTimeFormat('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
+    switch (dateOption) {
+      case 'upcoming-30':
+        return daysUntil >= 0 && daysUntil <= 30;
+      case 'this-month': {
+        const parts = evt.date.split('-');
+        if (parts.length !== 3) return false;
+        const evtYear = parseInt(parts[0], 10);
+        const evtMonth = parseInt(parts[1], 10) - 1;
+        return evtYear === currentYear && evtMonth === currentMonth;
+      }
+      case 'next-90':
+        return daysUntil >= 0 && daysUntil <= 90;
+      case 'past':
+        return daysUntil < 0;
+      default:
+        return true;
+    }
+  });
 }
 
 // Validation helpers
@@ -295,6 +373,11 @@ export function validateEventInput(data: Partial<EventItem>): { isValid: boolean
 
   if (!data.date) {
     errors.date = 'Event date is required';
+  } else {
+    const utc = parseDateToUtc(data.date);
+    if (isNaN(utc)) {
+      errors.date = 'Please provide a valid date format (YYYY-MM-DD)';
+    }
   }
 
   if (!data.venue || data.venue.trim().length === 0) {
@@ -352,7 +435,7 @@ export function validateGuestInput(data: Partial<GuestItem>): { isValid: boolean
   }
 
   if (data.email && data.email.trim().length > 0) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
     if (!emailRegex.test(data.email.trim())) {
       errors.email = 'Please provide a valid email address';
     }
@@ -377,10 +460,61 @@ export function validateTaskInput(data: Partial<TaskItem>): { isValid: boolean; 
 
   if (!data.dueDate) {
     errors.dueDate = 'Due date is required';
+  } else {
+    const utc = parseDateToUtc(data.dueDate);
+    if (isNaN(utc)) {
+      errors.dueDate = 'Please provide a valid due date (YYYY-MM-DD)';
+    }
   }
 
   return {
     isValid: Object.keys(errors).length === 0,
     errors,
   };
+}
+
+/**
+ * Strict schema validation for backup JSON archives.
+ */
+export function validateBackupSchema(data: unknown): { isValid: boolean; error?: string } {
+  if (!data || typeof data !== 'object') {
+    return { isValid: false, error: 'Backup data must be an object' };
+  }
+
+  const obj = data as Record<string, unknown>;
+
+  if (!Array.isArray(obj.events)) {
+    return { isValid: false, error: 'Backup is missing required "events" array' };
+  }
+
+  for (let i = 0; i < obj.events.length; i++) {
+    const item = obj.events[i];
+    if (!item || typeof item !== 'object') {
+      return { isValid: false, error: `Event at index ${i} is not a valid object` };
+    }
+    const e = item as Record<string, unknown>;
+    if (!e.id || typeof e.id !== 'string') {
+      return { isValid: false, error: `Event at index ${i} is missing a valid id` };
+    }
+    if (!e.title || typeof e.title !== 'string') {
+      return { isValid: false, error: `Event at index ${i} is missing a valid title` };
+    }
+    if (!e.date || typeof e.date !== 'string') {
+      return { isValid: false, error: `Event at index ${i} is missing a valid date` };
+    }
+  }
+
+  if (obj.expenses !== undefined && !Array.isArray(obj.expenses)) {
+    return { isValid: false, error: '"expenses" must be an array' };
+  }
+
+  if (obj.guests !== undefined && !Array.isArray(obj.guests)) {
+    return { isValid: false, error: '"guests" must be an array' };
+  }
+
+  if (obj.tasks !== undefined && !Array.isArray(obj.tasks)) {
+    return { isValid: false, error: '"tasks" must be an array' };
+  }
+
+  return { isValid: true };
 }

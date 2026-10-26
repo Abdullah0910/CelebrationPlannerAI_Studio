@@ -9,6 +9,7 @@ import {
   Sparkles,
   MapPin,
   PartyPopper,
+  Eye,
 } from 'lucide-react';
 import { useEventPlanner } from '../context/EventPlannerContext';
 import { EventItem, TaskItem } from '../types';
@@ -18,11 +19,13 @@ import { THEME_CONFIGS } from '../types/theme';
 interface CalendarViewProps {
   onOpenCreateEvent: () => void;
   onOpenAddTask: () => void;
+  onInspectEvent?: (event: EventItem) => void;
 }
 
 export const CalendarView: React.FC<CalendarViewProps> = ({
   onOpenCreateEvent,
   onOpenAddTask,
+  onInspectEvent,
 }) => {
   const {
     events,
@@ -37,7 +40,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
   // Base current date for initial month view
   const [currentMonthDate, setCurrentMonthDate] = useState(() => {
-    // If we have upcoming events, default around the first event or current date
     return new Date();
   });
 
@@ -67,7 +69,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     setSelectedDayStr(today.toISOString().split('T')[0]);
   };
 
-  // Generate calendar grid days for current month
+  // Generate calendar grid days using native Date arithmetic (immune to month/year boundary bugs)
   const year = currentMonthDate.getFullYear();
   const month = currentMonthDate.getMonth();
 
@@ -75,33 +77,27 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     currentMonthDate
   );
 
-  const firstDayOfWeek = new Date(year, month, 1).getDay(); // 0 is Sunday
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfMonth = new Date(year, month, 1);
+  const startDayOfWeek = firstDayOfMonth.getDay(); // 0 is Sunday
 
-  // Previous month trailing days
-  const prevMonthDays = new Date(year, month, 0).getDate();
+  // Standard 35 or 42 grid cells
+  const totalCells = startDayOfWeek + new Date(year, month + 1, 0).getDate() > 35 ? 42 : 35;
   const calendarCells: { dateStr: string; dayNum: number; isCurrentMonth: boolean }[] = [];
 
-  for (let i = firstDayOfWeek - 1; i >= 0; i--) {
-    const d = prevMonthDays - i;
-    const m = month === 0 ? 12 : month;
-    const y = month === 0 ? year - 1 : year;
-    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    calendarCells.push({ dateStr, dayNum: d, isCurrentMonth: false });
-  }
+  for (let i = 0; i < totalCells; i++) {
+    const cellDate = new Date(year, month, 1 - startDayOfWeek + i);
+    const cellYear = cellDate.getFullYear();
+    const cellMonth = cellDate.getMonth();
+    const cellDay = cellDate.getDate();
 
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    calendarCells.push({ dateStr, dayNum: d, isCurrentMonth: true });
-  }
+    const dateStr = `${cellYear}-${String(cellMonth + 1).padStart(2, '0')}-${String(cellDay).padStart(2, '0')}`;
+    const isCurrentMonth = cellMonth === month && cellYear === year;
 
-  // Trailing next month days to complete 35 or 42 cells
-  const remainingCells = (7 - (calendarCells.length % 7)) % 7;
-  for (let d = 1; d <= remainingCells; d++) {
-    const m = month === 11 ? 1 : month + 2;
-    const y = month === 11 ? year + 1 : year;
-    const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    calendarCells.push({ dateStr, dayNum: d, isCurrentMonth: false });
+    calendarCells.push({
+      dateStr,
+      dayNum: cellDay,
+      isCurrentMonth,
+    });
   }
 
   // Items on selected day
@@ -123,6 +119,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
         <div className="flex items-center gap-3">
           <select
+            aria-label="Filter calendar by event"
             value={selectedEventId}
             onChange={(e) => setSelectedEventId(e.target.value)}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
@@ -295,6 +292,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                     <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2">
                       {evt.description}
                     </p>
+
+                    {onInspectEvent && (
+                      <div className="pt-1.5 border-t border-amber-200/50 dark:border-amber-900/40">
+                        <button
+                          onClick={() => onInspectEvent(evt)}
+                          className="text-[11px] font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 flex items-center gap-1"
+                        >
+                          <Eye className="w-3 h-3" />
+                          <span>View Event Hub</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}

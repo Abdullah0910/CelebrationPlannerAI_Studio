@@ -14,7 +14,12 @@ import {
   Square,
 } from 'lucide-react';
 import { useEventPlanner } from '../context/EventPlannerContext';
-import { TaskCategory, TaskItem, TaskPriority } from '../types';
+import {
+  TaskCategoryFilter,
+  TaskItem,
+  TaskPriorityFilter,
+  TaskStatusFilter,
+} from '../types';
 import {
   calculateTaskSummary,
   formatDatePretty,
@@ -28,7 +33,7 @@ interface TasksViewProps {
   onDeleteTask: (id: string) => void;
 }
 
-const CATEGORIES: ('All' | TaskCategory)[] = [
+const CATEGORIES: TaskCategoryFilter[] = [
   'All',
   'Planning',
   'Vendor',
@@ -38,7 +43,13 @@ const CATEGORIES: ('All' | TaskCategory)[] = [
   'Day-of',
 ];
 
-const PRIORITIES: ('All' | TaskPriority)[] = ['All', 'High', 'Medium', 'Low'];
+const PRIORITIES: TaskPriorityFilter[] = ['All', 'High', 'Medium', 'Low'];
+
+const STATUS_OPTIONS: { value: TaskStatusFilter; label: string }[] = [
+  { value: 'all', label: 'All Tasks' },
+  { value: 'pending', label: 'Pending Only' },
+  { value: 'completed', label: 'Completed Only' },
+];
 
 export const TasksView: React.FC<TasksViewProps> = ({
   onOpenAddTask,
@@ -56,9 +67,9 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
   const themeCfg = THEME_CONFIGS[theme];
 
-  const [categoryFilter, setCategoryFilter] = useState<'All' | TaskCategory>('All');
-  const [priorityFilter, setPriorityFilter] = useState<'All' | TaskPriority>('All');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'completed'>('all');
+  const [categoryFilter, setCategoryFilter] = useState<TaskCategoryFilter>('All');
+  const [priorityFilter, setPriorityFilter] = useState<TaskPriorityFilter>('All');
+  const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('all');
   const [search, setSearch] = useState('');
 
   const activeEvent = events.find((e) => e.id === selectedEventId);
@@ -97,6 +108,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
 
         <div className="flex items-center gap-3">
           <select
+            aria-label="Filter tasks by event"
             value={selectedEventId}
             onChange={(e) => setSelectedEventId(e.target.value)}
             className="px-3 py-2 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
@@ -185,7 +197,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+      <div className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="relative flex-1">
             <input
@@ -199,28 +211,32 @@ export const TasksView: React.FC<TasksViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Status:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Status:</span>
             <select
+              aria-label="Filter tasks by completion status"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
+              onChange={(e) => setStatusFilter(e.target.value as TaskStatusFilter)}
               className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden capitalize"
             >
-              <option value="all">All Tasks</option>
-              <option value="pending">Pending Only</option>
-              <option value="completed">Completed Only</option>
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Priority:</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">Priority:</span>
             <select
+              aria-label="Filter tasks by priority level"
               value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value as any)}
+              onChange={(e) => setPriorityFilter(e.target.value as TaskPriorityFilter)}
               className="px-3 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 focus:outline-hidden"
             >
               {PRIORITIES.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {p === 'All' ? 'All Priorities' : `${p} Priority`}
                 </option>
               ))}
             </select>
@@ -272,7 +288,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
                 <div className="flex items-start gap-3.5 flex-1 min-w-0">
                   <button
                     onClick={() => toggleTask(task.id)}
-                    aria-label={task.completed ? 'Mark task as incomplete' : 'Mark task as complete'}
+                    aria-label={task.completed ? `Mark "${task.title}" as incomplete` : `Mark "${task.title}" as complete`}
                     className="mt-0.5 shrink-0 text-slate-400 hover:text-emerald-600 transition-colors"
                   >
                     {task.completed ? (

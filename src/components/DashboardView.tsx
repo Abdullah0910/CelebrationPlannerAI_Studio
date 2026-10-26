@@ -25,12 +25,14 @@ import {
   getDaysUntil,
 } from '../utils/eventCalculations';
 import { THEME_CONFIGS } from '../types/theme';
+import { EventItem } from '../types';
 
 interface DashboardViewProps {
   onOpenCreateEvent: () => void;
   onOpenAddExpense: () => void;
   onOpenAddGuest: () => void;
   onOpenAddTask: () => void;
+  onInspectEvent?: (event: EventItem) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -38,6 +40,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenAddExpense,
   onOpenAddGuest,
   onOpenAddTask,
+  onInspectEvent,
 }) => {
   const {
     events,
@@ -333,10 +336,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </span>
               <button
                 onClick={() => {
-                  setSelectedEventId(nextEvent.id);
-                  setActiveTab('events');
+                  if (onInspectEvent) {
+                    onInspectEvent(nextEvent);
+                  } else {
+                    setSelectedEventId(nextEvent.id);
+                    setActiveTab('events');
+                  }
                 }}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors"
+                title={`Open celebration hub for ${nextEvent.title}`}
               >
                 <span>View Event Hub</span>
                 <ArrowRight className="w-3.5 h-3.5" />

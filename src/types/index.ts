@@ -122,3 +122,15 @@ export interface ThemeConfig {
   gradient: string;
   tagline: string;
 }
+
+// Strong Filter Types (replaces any casts across UI)
+export type DateFilterOption = 'All' | 'all' | 'upcoming-30' | 'this-month' | 'next-90' | 'past';
+export type EventCategoryFilter = 'All' | EventType;
+export type EventStatusFilter = 'All' | EventStatus;
+export type ExpenseCategoryFilter = 'All' | ExpenseCategory;
+export type PaymentStatusFilter = 'all' | 'paid' | 'unpaid';
+export type GuestGroupFilter = 'All' | GuestGroup;
+export type GuestRsvpFilter = 'All' | RsvpStatus;
+export type TaskPriorityFilter = 'All' | TaskPriority;
+export type TaskCategoryFilter = 'All' | TaskCategory;
+export type TaskStatusFilter = 'all' | 'pending' | 'completed';

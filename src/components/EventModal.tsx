@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Clock, MapPin, Users, DollarSign, Image } from 'lucide-react';
 import { EventItem, EventType, EventStatus } from '../types';
-import { validateEventInput } from '../utils/eventCalculations';
+import { parseSafeNumber, validateEventInput } from '../utils/eventCalculations';
 import { THEME_CONFIGS } from '../types/theme';
 import { useEventPlanner } from '../context/EventPlannerContext';
 
@@ -54,6 +54,16 @@ export const EventModal: React.FC<EventModalProps> = ({
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  // Escape key handler for accessible dialog closing
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (eventToEdit) {
       setTitle(eventToEdit.title);
@@ -102,8 +112,8 @@ export const EventModal: React.FC<EventModalProps> = ({
       venue,
       venueAddress,
       description,
-      targetGuestCount: Number(targetGuestCount) || 0,
-      budgetTotal: Number(budgetTotal) || 0,
+      targetGuestCount: parseSafeNumber(targetGuestCount, 0, 0),
+      budgetTotal: parseSafeNumber(budgetTotal, 0, 0),
       status,
       coverImage,
       notes,
@@ -124,7 +134,7 @@ export const EventModal: React.FC<EventModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="event-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
     >
       <div className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xl my-8 overflow-hidden">
         {/* Header */}
@@ -150,11 +160,14 @@ export const EventModal: React.FC<EventModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[78vh] overflow-y-auto">
           {/* Title */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="event-title-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Celebration Title <span className="text-rose-500">*</span>
             </label>
             <input
+              id="event-title-input"
               type="text"
+              aria-invalid={!!errors.title}
+              aria-describedby={errors.title ? 'event-title-error' : undefined}
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value);
@@ -163,16 +176,19 @@ export const EventModal: React.FC<EventModalProps> = ({
               placeholder="e.g. Liam's 18th Milestone Birthday Bash"
               className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:border-slate-500 focus:outline-hidden"
             />
-            {errors.title && <p className="mt-1 text-xs text-rose-500">{errors.title}</p>}
+            {errors.title && (
+              <p id="event-title-error" className="mt-1 text-xs text-rose-500">{errors.title}</p>
+            )}
           </div>
 
           {/* Category & Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-category-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Category
               </label>
               <select
+                id="event-category-select"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as EventType)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden"
@@ -186,10 +202,11 @@ export const EventModal: React.FC<EventModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-status-select" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Planning Status
               </label>
               <select
+                id="event-status-select"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as EventStatus)}
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm focus:border-slate-500 focus:outline-hidden capitalize"
@@ -206,12 +223,15 @@ export const EventModal: React.FC<EventModalProps> = ({
           {/* Date & Time */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-date-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Date <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
+                  id="event-date-input"
                   type="date"
+                  aria-invalid={!!errors.date}
+                  aria-describedby={errors.date ? 'event-date-error' : undefined}
                   value={date}
                   onChange={(e) => {
                     setDate(e.target.value);
@@ -221,15 +241,18 @@ export const EventModal: React.FC<EventModalProps> = ({
                 />
                 <Calendar className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
               </div>
-              {errors.date && <p className="mt-1 text-xs text-rose-500">{errors.date}</p>}
+              {errors.date && (
+                <p id="event-date-error" className="mt-1 text-xs text-rose-500">{errors.date}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-time-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Start Time
               </label>
               <div className="relative">
                 <input
+                  id="event-time-input"
                   type="time"
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
@@ -243,12 +266,15 @@ export const EventModal: React.FC<EventModalProps> = ({
           {/* Venue & Address */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-venue-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Venue Name <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
                 <input
+                  id="event-venue-input"
                   type="text"
+                  aria-invalid={!!errors.venue}
+                  aria-describedby={errors.venue ? 'event-venue-error' : undefined}
                   value={venue}
                   onChange={(e) => {
                     setVenue(e.target.value);
@@ -259,14 +285,17 @@ export const EventModal: React.FC<EventModalProps> = ({
                 />
                 <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
               </div>
-              {errors.venue && <p className="mt-1 text-xs text-rose-500">{errors.venue}</p>}
+              {errors.venue && (
+                <p id="event-venue-error" className="mt-1 text-xs text-rose-500">{errors.venue}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-address-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Venue Address
               </label>
               <input
+                id="event-address-input"
                 type="text"
                 value={venueAddress}
                 onChange={(e) => setVenueAddress(e.target.value)}
@@ -279,16 +308,17 @@ export const EventModal: React.FC<EventModalProps> = ({
           {/* Budget & Target Guests */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-budget-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Total Budget ($)
               </label>
               <div className="relative">
                 <input
+                  id="event-budget-input"
                   type="number"
                   min="0"
                   step="50"
-                  value={budgetTotal}
-                  onChange={(e) => setBudgetTotal(Number(e.target.value))}
+                  value={budgetTotal || ''}
+                  onChange={(e) => setBudgetTotal(parseSafeNumber(e.target.value, 0, 0))}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
                 />
                 <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -296,15 +326,16 @@ export const EventModal: React.FC<EventModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+              <label htmlFor="event-guest-count-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
                 Target Guest Count
               </label>
               <div className="relative">
                 <input
+                  id="event-guest-count-input"
                   type="number"
                   min="1"
-                  value={targetGuestCount}
-                  onChange={(e) => setTargetGuestCount(Number(e.target.value))}
+                  value={targetGuestCount || ''}
+                  onChange={(e) => setTargetGuestCount(parseSafeNumber(e.target.value, 1, 0))}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
                 />
                 <Users className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -355,10 +386,11 @@ export const EventModal: React.FC<EventModalProps> = ({
 
           {/* Description */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="event-description-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Description & Vision
             </label>
             <textarea
+              id="event-description-input"
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -369,10 +401,11 @@ export const EventModal: React.FC<EventModalProps> = ({
 
           {/* Notes */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+            <label htmlFor="event-notes-input" className="block text-xs font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
               Planning Notes (Private)
             </label>
             <textarea
+              id="event-notes-input"
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
