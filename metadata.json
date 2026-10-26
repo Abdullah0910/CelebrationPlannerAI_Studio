@@ -1,0 +1,6 @@
+{
+  "name": "Celebration & Event Planner",
+  "description": "Comprehensive modern celebration and event planner with budget tracking, guest RSVPs, task checklists, and interactive calendar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
