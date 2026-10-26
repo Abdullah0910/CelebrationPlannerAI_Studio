@@ -14,7 +14,7 @@ import {
   TaskItem,
   ThemePreset,
 } from '../types';
-import { validateBackupSchema } from '../utils/eventCalculations';
+import { sanitizeBackupData, validateBackupSchema } from '../utils/eventCalculations';
 
 interface NotificationState {
   type: 'success' | 'error' | 'info';
@@ -360,22 +360,42 @@ export const EventPlannerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   };
 
   const importData = (jsonStr: string): { success: boolean; message: string } => {
+    if (typeof jsonStr !== 'string' || jsonStr.trim().length === 0) {
+      return { success: false, message: 'Backup file is empty.' };
+    }
+
+    // Limit maximum backup file size to 5 MB to prevent memory exhaustion DoS
+    if (jsonStr.length > 5 * 1024 * 1024) {
+      return { success: false, message: 'Backup file exceeds maximum allowed size (5 MB).' };
+    }
+
     try {
-      const parsed = JSON.parse(jsonStr);
+      // JSON reviver to filter out prototype pollution keys
+      const parsed = JSON.parse(jsonStr, (key, value) => {
+        if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+          return undefined;
+        }
+        return value;
+      });
+
       const schemaCheck = validateBackupSchema(parsed);
       if (!schemaCheck.isValid) {
         return { success: false, message: schemaCheck.error || 'Invalid backup schema structure.' };
       }
 
-      setEvents(parsed.events);
-      if (Array.isArray(parsed.expenses)) setExpenses(parsed.expenses);
-      if (Array.isArray(parsed.guests)) setGuests(parsed.guests);
-      if (Array.isArray(parsed.tasks)) setTasks(parsed.tasks);
+      // Sanitize all imported records before committing to React state
+      const sanitized = sanitizeBackupData(parsed);
+
+      setEvents(sanitized.events);
+      setExpenses(sanitized.expenses);
+      setGuests(sanitized.guests);
+      setTasks(sanitized.tasks);
+
       if (parsed.theme && ['gold', 'rose', 'indigo', 'emerald', 'noir'].includes(parsed.theme)) {
         setTheme(parsed.theme as ThemePreset);
       }
 
-      notify('success', 'Data successfully restored from backup.');
+      notify('success', `Data successfully restored (${sanitized.events.length} celebrations imported).`);
       return { success: true, message: 'Data successfully restored.' };
     } catch {
       return { success: false, message: 'Failed to parse JSON file. Please ensure it is valid JSON.' };

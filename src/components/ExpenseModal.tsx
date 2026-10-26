@@ -180,6 +180,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             <input
               id="expense-name-input"
               type="text"
+              maxLength={120}
               aria-invalid={!!errors.name}
               aria-describedby={errors.name ? 'expense-name-error' : undefined}
               value={name}
@@ -224,6 +225,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
                 <input
                   id="expense-vendor-input"
                   type="text"
+                  maxLength={150}
                   value={vendor}
                   onChange={(e) => setVendor(e.target.value)}
                   placeholder="e.g. Flora Boutique"
@@ -245,9 +247,10 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
                   id="expense-estimated-input"
                   type="number"
                   min="0"
+                  max="100000000"
                   step="10"
                   value={estimatedCost || ''}
-                  onChange={(e) => setEstimatedCost(parseSafeNumber(e.target.value, 0, 0))}
+                  onChange={(e) => setEstimatedCost(parseSafeNumber(e.target.value, 0, 0, 100000000))}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
                 />
                 <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -263,12 +266,13 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
                   id="expense-actual-input"
                   type="number"
                   min="0"
+                  max="100000000"
                   step="10"
                   aria-invalid={!!errors.actualCost}
                   aria-describedby={errors.actualCost ? 'expense-actual-error' : undefined}
                   value={actualCost || ''}
                   onChange={(e) => {
-                    setActualCost(parseSafeNumber(e.target.value, 0, 0));
+                    setActualCost(parseSafeNumber(e.target.value, 0, 0, 100000000));
                     if (errors.actualCost) setErrors((prev) => ({ ...prev, actualCost: '' }));
                   }}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
@@ -290,10 +294,11 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
                   id="expense-paid-input"
                   type="number"
                   min="0"
+                  max="100000000"
                   step="10"
                   value={paidAmount || ''}
                   onChange={(e) => {
-                    const val = parseSafeNumber(e.target.value, 0, 0);
+                    const val = parseSafeNumber(e.target.value, 0, 0, 100000000);
                     setPaidAmount(val);
                     if (val >= actualCost && actualCost > 0) {
                       setIsPaid(true);
@@ -344,6 +349,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
             <textarea
               id="expense-notes-input"
               rows={2}
+              maxLength={1000}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. 50% deposit paid on booking, final check on delivery day."

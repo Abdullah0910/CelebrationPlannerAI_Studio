@@ -23,6 +23,7 @@ import {
   formatDatePretty,
   formatEventCountdown,
   getDaysUntil,
+  sanitizeImageUrl,
 } from '../utils/eventCalculations';
 import { THEME_CONFIGS } from '../types/theme';
 import { EventItem } from '../types';
@@ -270,9 +271,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="relative aspect-21/9 sm:aspect-16/7 w-full overflow-hidden bg-slate-100 dark:bg-slate-800">
                 {nextEvent.coverImage ? (
                   <img
-                    src={nextEvent.coverImage}
+                    src={sanitizeImageUrl(nextEvent.coverImage)}
                     alt={nextEvent.title}
                     referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = '/src/assets/images/celebration_wedding_1792744715346.jpg';
+                    }}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -471,9 +475,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="relative aspect-16/9 rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 mb-3">
                   {evt.coverImage ? (
                     <img
-                      src={evt.coverImage}
+                      src={sanitizeImageUrl(evt.coverImage)}
                       alt={evt.title}
                       referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = '/src/assets/images/celebration_wedding_1792744715346.jpg';
+                      }}
                       className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
                     />
                   ) : (

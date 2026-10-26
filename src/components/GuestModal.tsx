@@ -187,6 +187,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               <input
                 id="guest-name-input"
                 type="text"
+                maxLength={100}
                 aria-invalid={!!errors.name}
                 aria-describedby={errors.name ? 'guest-name-error' : undefined}
                 value={name}
@@ -212,6 +213,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 <input
                   id="guest-email-input"
                   type="email"
+                  maxLength={120}
                   aria-invalid={!!errors.email}
                   aria-describedby={errors.email ? 'guest-email-error' : undefined}
                   value={email}
@@ -235,13 +237,20 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 <input
                   id="guest-phone-input"
                   type="tel"
+                  maxLength={25}
+                  aria-invalid={!!errors.phone}
+                  aria-describedby={errors.phone ? 'guest-phone-error' : undefined}
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    if (errors.phone) setErrors((prev) => ({ ...prev, phone: '' }));
+                  }}
                   placeholder="+1 (555) 019-2831"
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 text-sm focus:border-slate-500 focus:outline-hidden"
                 />
                 <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
               </div>
+              {errors.phone && <p id="guest-phone-error" className="mt-1 text-xs text-rose-500">{errors.phone}</p>}
             </div>
           </div>
 
@@ -297,11 +306,17 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 id="guest-plus-ones-input"
                 type="number"
                 min="0"
-                max="10"
+                max="20"
+                aria-invalid={!!errors.plusOnes}
+                aria-describedby={errors.plusOnes ? 'guest-plus-ones-error' : undefined}
                 value={plusOnes || ''}
-                onChange={(e) => setPlusOnes(parseSafeNumber(e.target.value, 0, 0))}
+                onChange={(e) => {
+                  setPlusOnes(parseSafeNumber(e.target.value, 0, 0, 20));
+                  if (errors.plusOnes) setErrors((prev) => ({ ...prev, plusOnes: '' }));
+                }}
                 className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
               />
+              {errors.plusOnes && <p id="guest-plus-ones-error" className="mt-1 text-xs text-rose-500">{errors.plusOnes}</p>}
             </div>
 
             <div>
@@ -330,6 +345,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
                 <input
                   id="guest-table-input"
                   type="text"
+                  maxLength={20}
                   value={tableNumber}
                   onChange={(e) => setTableNumber(e.target.value)}
                   placeholder="e.g. Table 2"
@@ -370,6 +386,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
               <input
                 id="guest-dietary-notes"
                 type="text"
+                maxLength={255}
                 value={dietaryNotes}
                 onChange={(e) => setDietaryNotes(e.target.value)}
                 placeholder="e.g. Severe peanut allergy"
@@ -386,6 +403,7 @@ export const GuestModal: React.FC<GuestModalProps> = ({
             <textarea
               id="guest-notes-input"
               rows={2}
+              maxLength={1000}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. High school friend, needs wheelchair-accessible ramp."

@@ -24,6 +24,7 @@ import {
   formatCurrency,
   formatDatePretty,
   formatEventCountdown,
+  sanitizeImageUrl,
 } from '../utils/eventCalculations';
 import { useEventPlanner } from '../context/EventPlannerContext';
 import { THEME_CONFIGS } from '../types/theme';
@@ -86,9 +87,12 @@ export const EventDetailModal: React.FC<EventDetailModalProps> = ({
         <div className="relative aspect-21/9 sm:aspect-16/6 w-full bg-slate-100 dark:bg-slate-800 overflow-hidden shrink-0">
           {event.coverImage ? (
             <img
-              src={event.coverImage}
+              src={sanitizeImageUrl(event.coverImage)}
               alt={event.title}
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = '/src/assets/images/celebration_wedding_1792744715346.jpg';
+              }}
               className="w-full h-full object-cover"
             />
           ) : (

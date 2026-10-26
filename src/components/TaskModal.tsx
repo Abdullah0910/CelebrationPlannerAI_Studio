@@ -164,6 +164,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             <input
               id="task-title-input"
               type="text"
+              maxLength={150}
               aria-invalid={!!errors.title}
               aria-describedby={errors.title ? 'task-title-error' : undefined}
               value={title}
@@ -251,6 +252,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 <input
                   id="task-assignee-input"
                   type="text"
+                  maxLength={100}
                   value={assignedTo}
                   onChange={(e) => setAssignedTo(e.target.value)}
                   placeholder="e.g. Wedding Coordinator"
@@ -284,6 +286,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             <textarea
               id="task-notes-input"
               rows={2}
+              maxLength={1000}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Bring fabric swatches to match tablecloth colors."

@@ -55,6 +55,20 @@ export const SettingsView: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Reject files larger than 5 MB
+    if (file.size > 5 * 1024 * 1024) {
+      notify('error', 'Backup file exceeds maximum allowed size of 5 MB.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    // Verify .json extension
+    if (!file.name.toLowerCase().endsWith('.json')) {
+      notify('error', 'Please select a valid .json backup file.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const content = event.target?.result as string;
@@ -66,6 +80,9 @@ export const SettingsView: React.FC = () => {
           notify('error', res.message);
         }
       }
+    };
+    reader.onerror = () => {
+      notify('error', 'Failed to read backup file from disk.');
     };
     reader.readAsText(file);
     // Reset file input
@@ -181,6 +198,7 @@ export const SettingsView: React.FC = () => {
             ref={fileInputRef}
             onChange={handleFileChange}
             accept=".json"
+            aria-label="Upload JSON backup archive"
             className="hidden"
           />
           <button

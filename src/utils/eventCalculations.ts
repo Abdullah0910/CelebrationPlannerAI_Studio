@@ -57,14 +57,86 @@ export interface TaskSummary {
 }
 
 /**
- * Safe numeric parser with minimum bounds protection.
+ * Safe numeric parser with minimum and maximum bounds protection.
  */
-export function parseSafeNumber(val: unknown, fallback = 0, min?: number): number {
+export function parseSafeNumber(val: unknown, fallback = 0, min?: number, max?: number): number {
   const num = typeof val === 'number' ? val : parseFloat(String(val));
   if (isNaN(num) || !isFinite(num)) {
-    return min !== undefined ? Math.max(min, fallback) : fallback;
+    let result = fallback;
+    if (min !== undefined) result = Math.max(min, result);
+    if (max !== undefined) result = Math.min(max, result);
+    return result;
   }
-  return min !== undefined ? Math.max(min, num) : num;
+  let result = num;
+  if (min !== undefined) result = Math.max(min, result);
+  if (max !== undefined) result = Math.min(max, result);
+  return result;
+}
+
+/**
+ * Strips non-printable ASCII control characters and limits string length.
+ * Neutralizes control-character injection while preserving readable unicode text.
+ */
+export function sanitizeString(val: unknown, maxLength = 255): string {
+  if (typeof val !== 'string') return '';
+  // Remove ASCII control characters (0-8, 11-12, 14-31, 127) except tab and newline
+  const cleaned = val.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim();
+  return cleaned.slice(0, maxLength);
+}
+
+/**
+ * Verifies if an image URL is safe to render in the DOM.
+ * Permits secure HTTPS/HTTP protocols, local static asset paths, or safe raster/vector data URIs.
+ * Strictly blocks 'javascript:', 'data:text/html', 'vbscript:', 'file:', and control characters.
+ */
+export function isSafeImageUrl(url: unknown): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (trimmed.length === 0 || trimmed.length > 2048) return false;
+
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith('javascript:') ||
+    lower.startsWith('data:text/html') ||
+    lower.startsWith('vbscript:') ||
+    lower.startsWith('file:')
+  ) {
+    return false;
+  }
+
+  // Safe local asset paths (e.g. /src/assets/images/..., ./assets/party.png, /assets/...)
+  if (/^(?:\.\/|\/)(?:src\/)?assets\/(?:images\/)?[a-zA-Z0-9_\-./]+\.(?:jpg|jpeg|png|webp|svg|gif)$/i.test(trimmed)) {
+    return true;
+  }
+
+  // Safe HTTP and HTTPS URLs with valid hostname
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') {
+      return Boolean(parsed.hostname && parsed.hostname.includes('.'));
+    }
+    if (parsed.protocol === 'data:') {
+      return /^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(trimmed);
+    }
+  } catch {
+    // Relative path or data URL regex
+    return /^data:image\/(?:png|jpeg|jpg|webp|gif|svg\+xml);base64,[A-Za-z0-9+/=]+$/i.test(trimmed);
+  }
+
+  return false;
+}
+
+/**
+ * Sanitizes an image URL, falling back to a safe default preset if invalid or potentially malicious.
+ */
+export function sanitizeImageUrl(
+  url: unknown,
+  fallback = '/src/assets/images/celebration_wedding_1792744715346.jpg'
+): string {
+  if (typeof url === 'string' && isSafeImageUrl(url)) {
+    return url.trim();
+  }
+  return fallback;
 }
 
 /**
@@ -369,6 +441,8 @@ export function validateEventInput(data: Partial<EventItem>): { isValid: boolean
     errors.title = 'Event title is required';
   } else if (data.title.trim().length < 3) {
     errors.title = 'Event title must be at least 3 characters';
+  } else if (data.title.trim().length > 120) {
+    errors.title = 'Event title must be 120 characters or fewer';
   }
 
   if (!data.date) {
@@ -382,14 +456,34 @@ export function validateEventInput(data: Partial<EventItem>): { isValid: boolean
 
   if (!data.venue || data.venue.trim().length === 0) {
     errors.venue = 'Venue name is required';
+  } else if (data.venue.trim().length > 150) {
+    errors.venue = 'Venue name must be 150 characters or fewer';
   }
 
-  if (data.targetGuestCount !== undefined && data.targetGuestCount < 0) {
-    errors.targetGuestCount = 'Target guest count cannot be negative';
+  if (data.venueAddress && data.venueAddress.trim().length > 200) {
+    errors.venueAddress = 'Venue address must be 200 characters or fewer';
   }
 
-  if (data.budgetTotal !== undefined && data.budgetTotal < 0) {
-    errors.budgetTotal = 'Total budget cannot be negative';
+  if (data.targetGuestCount !== undefined) {
+    if (data.targetGuestCount < 0) {
+      errors.targetGuestCount = 'Target guest count cannot be negative';
+    } else if (data.targetGuestCount > 1000000) {
+      errors.targetGuestCount = 'Target guest count cannot exceed 1,000,000';
+    }
+  }
+
+  if (data.budgetTotal !== undefined) {
+    if (data.budgetTotal < 0) {
+      errors.budgetTotal = 'Total budget cannot be negative';
+    } else if (data.budgetTotal > 100000000) {
+      errors.budgetTotal = 'Total budget cannot exceed $100,000,000';
+    }
+  }
+
+  if (data.coverImage && data.coverImage.trim().length > 0) {
+    if (!isSafeImageUrl(data.coverImage)) {
+      errors.coverImage = 'Cover image must be a safe http(s) URL, valid asset path, or data image';
+    }
   }
 
   return {
@@ -403,22 +497,43 @@ export function validateExpenseInput(data: Partial<ExpenseItem>): { isValid: boo
 
   if (!data.name || data.name.trim().length === 0) {
     errors.name = 'Expense description is required';
+  } else if (data.name.trim().length > 120) {
+    errors.name = 'Expense description must be 120 characters or fewer';
   }
 
   if (!data.category) {
     errors.category = 'Expense category is required';
   }
 
-  if (data.actualCost !== undefined && (isNaN(Number(data.actualCost)) || Number(data.actualCost) < 0)) {
-    errors.actualCost = 'Actual cost must be a positive number';
+  if (data.vendor && data.vendor.trim().length > 150) {
+    errors.vendor = 'Vendor name must be 150 characters or fewer';
   }
 
-  if (data.estimatedCost !== undefined && (isNaN(Number(data.estimatedCost)) || Number(data.estimatedCost) < 0)) {
-    errors.estimatedCost = 'Estimated cost must be a positive number';
+  if (data.actualCost !== undefined) {
+    const num = Number(data.actualCost);
+    if (isNaN(num) || num < 0) {
+      errors.actualCost = 'Actual cost must be a positive number';
+    } else if (num > 100000000) {
+      errors.actualCost = 'Actual cost cannot exceed $100,000,000';
+    }
   }
 
-  if (data.paidAmount !== undefined && (isNaN(Number(data.paidAmount)) || Number(data.paidAmount) < 0)) {
-    errors.paidAmount = 'Paid amount must be a positive number';
+  if (data.estimatedCost !== undefined) {
+    const num = Number(data.estimatedCost);
+    if (isNaN(num) || num < 0) {
+      errors.estimatedCost = 'Estimated cost must be a positive number';
+    } else if (num > 100000000) {
+      errors.estimatedCost = 'Estimated cost cannot exceed $100,000,000';
+    }
+  }
+
+  if (data.paidAmount !== undefined) {
+    const num = Number(data.paidAmount);
+    if (isNaN(num) || num < 0) {
+      errors.paidAmount = 'Paid amount must be a positive number';
+    } else if (num > 100000000) {
+      errors.paidAmount = 'Paid amount cannot exceed $100,000,000';
+    }
   }
 
   return {
@@ -432,17 +547,41 @@ export function validateGuestInput(data: Partial<GuestItem>): { isValid: boolean
 
   if (!data.name || data.name.trim().length === 0) {
     errors.name = 'Guest name is required';
+  } else if (data.name.trim().length > 100) {
+    errors.name = 'Guest name must be 100 characters or fewer';
   }
 
   if (data.email && data.email.trim().length > 0) {
-    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
-    if (!emailRegex.test(data.email.trim())) {
-      errors.email = 'Please provide a valid email address';
+    const trimmed = data.email.trim();
+    if (trimmed.length > 120) {
+      errors.email = 'Email must be 120 characters or fewer';
+    } else {
+      const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/;
+      if (!emailRegex.test(trimmed)) {
+        errors.email = 'Please provide a valid email address';
+      }
     }
   }
 
-  if (data.plusOnes !== undefined && data.plusOnes < 0) {
-    errors.plusOnes = 'Plus-ones cannot be negative';
+  if (data.phone && data.phone.trim().length > 0) {
+    const trimmedPhone = data.phone.trim();
+    if (trimmedPhone.length > 25) {
+      errors.phone = 'Phone number must be 25 characters or fewer';
+    } else if (!/^[+()0-9\s.-]{7,25}$/.test(trimmedPhone)) {
+      errors.phone = 'Please provide a valid phone number';
+    }
+  }
+
+  if (data.plusOnes !== undefined) {
+    if (data.plusOnes < 0) {
+      errors.plusOnes = 'Plus-ones cannot be negative';
+    } else if (data.plusOnes > 20) {
+      errors.plusOnes = 'Plus-ones cannot exceed 20 guests';
+    }
+  }
+
+  if (data.tableNumber && data.tableNumber.trim().length > 20) {
+    errors.tableNumber = 'Table number must be 20 characters or fewer';
   }
 
   return {
@@ -456,6 +595,12 @@ export function validateTaskInput(data: Partial<TaskItem>): { isValid: boolean; 
 
   if (!data.title || data.title.trim().length === 0) {
     errors.title = 'Task title is required';
+  } else if (data.title.trim().length > 150) {
+    errors.title = 'Task title must be 150 characters or fewer';
+  }
+
+  if (data.assignedTo && data.assignedTo.trim().length > 100) {
+    errors.assignedTo = 'Assignee must be 100 characters or fewer';
   }
 
   if (!data.dueDate) {
@@ -474,22 +619,46 @@ export function validateTaskInput(data: Partial<TaskItem>): { isValid: boolean; 
 }
 
 /**
- * Strict schema validation for backup JSON archives.
+ * Strict schema validation for backup JSON archives with prototype pollution protection.
  */
 export function validateBackupSchema(data: unknown): { isValid: boolean; error?: string } {
-  if (!data || typeof data !== 'object') {
+  if (typeof data === 'string') {
+    if (data.includes('__proto__') || data.includes('"constructor"') || data.includes('"prototype"')) {
+      return { isValid: false, error: 'Backup contains prohibited prototype pollution keys' };
+    }
+    try {
+      data = JSON.parse(data);
+    } catch {
+      return { isValid: false, error: 'Invalid JSON format in backup file' };
+    }
+  }
+
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
     return { isValid: false, error: 'Backup data must be an object' };
   }
 
   const obj = data as Record<string, unknown>;
 
+  // Block prototype pollution
+  if (
+    Object.prototype.hasOwnProperty.call(obj, '__proto__') ||
+    Object.prototype.hasOwnProperty.call(obj, 'constructor') ||
+    Object.prototype.hasOwnProperty.call(obj, 'prototype')
+  ) {
+    return { isValid: false, error: 'Backup contains prohibited prototype pollution keys' };
+  }
+
   if (!Array.isArray(obj.events)) {
     return { isValid: false, error: 'Backup is missing required "events" array' };
   }
 
+  if (obj.events.length > 5000) {
+    return { isValid: false, error: 'Events list exceeds maximum capacity (5,000 events)' };
+  }
+
   for (let i = 0; i < obj.events.length; i++) {
     const item = obj.events[i];
-    if (!item || typeof item !== 'object') {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
       return { isValid: false, error: `Event at index ${i} is not a valid object` };
     }
     const e = item as Record<string, unknown>;
@@ -504,17 +673,126 @@ export function validateBackupSchema(data: unknown): { isValid: boolean; error?:
     }
   }
 
-  if (obj.expenses !== undefined && !Array.isArray(obj.expenses)) {
-    return { isValid: false, error: '"expenses" must be an array' };
+  if (obj.expenses !== undefined) {
+    if (!Array.isArray(obj.expenses)) {
+      return { isValid: false, error: '"expenses" must be an array' };
+    }
+    if (obj.expenses.length > 20000) {
+      return { isValid: false, error: 'Expenses list exceeds maximum allowable limit (20,000 items)' };
+    }
   }
 
-  if (obj.guests !== undefined && !Array.isArray(obj.guests)) {
-    return { isValid: false, error: '"guests" must be an array' };
+  if (obj.guests !== undefined) {
+    if (!Array.isArray(obj.guests)) {
+      return { isValid: false, error: '"guests" must be an array' };
+    }
+    if (obj.guests.length > 20000) {
+      return { isValid: false, error: 'Guests list exceeds maximum allowable limit (20,000 items)' };
+    }
   }
 
-  if (obj.tasks !== undefined && !Array.isArray(obj.tasks)) {
-    return { isValid: false, error: '"tasks" must be an array' };
+  if (obj.tasks !== undefined) {
+    if (!Array.isArray(obj.tasks)) {
+      return { isValid: false, error: '"tasks" must be an array' };
+    }
+    if (obj.tasks.length > 20000) {
+      return { isValid: false, error: 'Tasks list exceeds maximum allowable limit (20,000 items)' };
+    }
   }
 
   return { isValid: true };
+}
+
+/**
+ * Deeply sanitizes parsed backup data, ensuring types and safe protocols.
+ */
+export function sanitizeBackupData(data: Record<string, unknown>): {
+  events: EventItem[];
+  expenses: ExpenseItem[];
+  guests: GuestItem[];
+  tasks: TaskItem[];
+} {
+  const rawEvents = Array.isArray(data.events) ? data.events : [];
+  const rawExpenses = Array.isArray(data.expenses) ? data.expenses : [];
+  const rawGuests = Array.isArray(data.guests) ? data.guests : [];
+  const rawTasks = Array.isArray(data.tasks) ? data.tasks : [];
+
+  const events: EventItem[] = rawEvents
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((e) => ({
+      id: sanitizeString(e.id, 64) || 'evt-' + Math.random().toString(36).slice(2, 9),
+      title: sanitizeString(e.title, 120) || 'Untitled Celebration',
+      category: (e.category as any) || 'Birthday',
+      date: sanitizeString(e.date, 10),
+      time: sanitizeString(e.time, 5) || '18:00',
+      venue: sanitizeString(e.venue, 150) || 'TBD',
+      venueAddress: e.venueAddress ? sanitizeString(e.venueAddress, 200) : undefined,
+      description: sanitizeString(e.description, 1000),
+      targetGuestCount: parseSafeNumber(e.targetGuestCount, 0, 0, 1000000),
+      budgetTotal: parseSafeNumber(e.budgetTotal, 0, 0, 100000000),
+      status: (['planning', 'confirmed', 'completed', 'cancelled'].includes(String(e.status))
+        ? e.status
+        : 'planning') as any,
+      coverImage: isSafeImageUrl(e.coverImage)
+        ? String(e.coverImage).trim()
+        : '/src/assets/images/celebration_wedding_1792744715346.jpg',
+      notes: e.notes ? sanitizeString(e.notes, 2000) : undefined,
+      createdAt: sanitizeString(e.createdAt, 30) || new Date().toISOString(),
+      updatedAt: sanitizeString(e.updatedAt, 30) || new Date().toISOString(),
+    }));
+
+  const expenses: ExpenseItem[] = rawExpenses
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((exp) => ({
+      id: sanitizeString(exp.id, 64) || 'exp-' + Math.random().toString(36).slice(2, 9),
+      eventId: sanitizeString(exp.eventId, 64),
+      name: sanitizeString(exp.name, 120) || 'Expense',
+      category: (exp.category as any) || 'Miscellaneous',
+      estimatedCost: parseSafeNumber(exp.estimatedCost, 0, 0, 100000000),
+      actualCost: parseSafeNumber(exp.actualCost, 0, 0, 100000000),
+      paidAmount: parseSafeNumber(exp.paidAmount, 0, 0, 100000000),
+      isPaid: Boolean(exp.isPaid),
+      dueDate: exp.dueDate ? sanitizeString(exp.dueDate, 10) : undefined,
+      vendor: exp.vendor ? sanitizeString(exp.vendor, 150) : undefined,
+      notes: exp.notes ? sanitizeString(exp.notes, 1000) : undefined,
+      receiptNote: exp.receiptNote ? sanitizeString(exp.receiptNote, 500) : undefined,
+    }));
+
+  const guests: GuestItem[] = rawGuests
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((g) => ({
+      id: sanitizeString(g.id, 64) || 'gst-' + Math.random().toString(36).slice(2, 9),
+      eventId: sanitizeString(g.eventId, 64),
+      name: sanitizeString(g.name, 100) || 'Guest',
+      email: sanitizeString(g.email, 120),
+      phone: g.phone ? sanitizeString(g.phone, 25) : undefined,
+      group: (g.group as any) || 'Friends',
+      rsvpStatus: (['Attending', 'Declined', 'Tentative', 'Pending'].includes(String(g.rsvpStatus))
+        ? g.rsvpStatus
+        : 'Pending') as any,
+      invitationStatus: (['Not Sent', 'Sent', 'Delivered'].includes(String(g.invitationStatus))
+        ? g.invitationStatus
+        : 'Sent') as any,
+      dietary: (g.dietary as any) || 'None',
+      dietaryNotes: g.dietaryNotes ? sanitizeString(g.dietaryNotes, 255) : undefined,
+      plusOnes: parseSafeNumber(g.plusOnes, 0, 0, 20),
+      tableNumber: g.tableNumber ? sanitizeString(g.tableNumber, 20) : undefined,
+      notes: g.notes ? sanitizeString(g.notes, 1000) : undefined,
+    }));
+
+  const tasks: TaskItem[] = rawTasks
+    .filter((item): item is Record<string, unknown> => !!item && typeof item === 'object')
+    .map((t) => ({
+      id: sanitizeString(t.id, 64) || 'tsk-' + Math.random().toString(36).slice(2, 9),
+      eventId: sanitizeString(t.eventId, 64),
+      title: sanitizeString(t.title, 150) || 'Task',
+      category: (t.category as any) || 'Planning',
+      priority: (['High', 'Medium', 'Low'].includes(String(t.priority)) ? t.priority : 'Medium') as any,
+      dueDate: sanitizeString(t.dueDate, 10),
+      completed: Boolean(t.completed),
+      assignedTo: t.assignedTo ? sanitizeString(t.assignedTo, 100) : undefined,
+      notes: t.notes ? sanitizeString(t.notes, 1000) : undefined,
+    }));
+
+  return { events, expenses, guests, tasks };
 }

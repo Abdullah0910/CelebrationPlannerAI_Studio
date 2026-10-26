@@ -166,6 +166,7 @@ export const EventModal: React.FC<EventModalProps> = ({
             <input
               id="event-title-input"
               type="text"
+              maxLength={120}
               aria-invalid={!!errors.title}
               aria-describedby={errors.title ? 'event-title-error' : undefined}
               value={title}
@@ -273,6 +274,7 @@ export const EventModal: React.FC<EventModalProps> = ({
                 <input
                   id="event-venue-input"
                   type="text"
+                  maxLength={150}
                   aria-invalid={!!errors.venue}
                   aria-describedby={errors.venue ? 'event-venue-error' : undefined}
                   value={venue}
@@ -297,6 +299,7 @@ export const EventModal: React.FC<EventModalProps> = ({
               <input
                 id="event-address-input"
                 type="text"
+                maxLength={200}
                 value={venueAddress}
                 onChange={(e) => setVenueAddress(e.target.value)}
                 placeholder="e.g. 742 Evergreen Terrace, Suite 4B"
@@ -316,9 +319,10 @@ export const EventModal: React.FC<EventModalProps> = ({
                   id="event-budget-input"
                   type="number"
                   min="0"
+                  max="100000000"
                   step="50"
                   value={budgetTotal || ''}
-                  onChange={(e) => setBudgetTotal(parseSafeNumber(e.target.value, 0, 0))}
+                  onChange={(e) => setBudgetTotal(parseSafeNumber(e.target.value, 0, 0, 100000000))}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
                 />
                 <DollarSign className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -334,8 +338,9 @@ export const EventModal: React.FC<EventModalProps> = ({
                   id="event-guest-count-input"
                   type="number"
                   min="1"
+                  max="1000000"
                   value={targetGuestCount || ''}
-                  onChange={(e) => setTargetGuestCount(parseSafeNumber(e.target.value, 1, 0))}
+                  onChange={(e) => setTargetGuestCount(parseSafeNumber(e.target.value, 1, 0, 1000000))}
                   className="w-full px-3.5 py-2.5 pl-10 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 text-sm tabular-nums focus:border-slate-500 focus:outline-hidden"
                 />
                 <Users className="w-4 h-4 text-slate-400 absolute left-3.5 top-3 pointer-events-none" />
@@ -375,13 +380,22 @@ export const EventModal: React.FC<EventModalProps> = ({
             <div className="relative">
               <input
                 type="text"
+                maxLength={2048}
+                aria-invalid={!!errors.coverImage}
+                aria-describedby={errors.coverImage ? 'event-cover-error' : undefined}
                 value={coverImage}
-                onChange={(e) => setCoverImage(e.target.value)}
+                onChange={(e) => {
+                  setCoverImage(e.target.value);
+                  if (errors.coverImage) setErrors((prev) => ({ ...prev, coverImage: '' }));
+                }}
                 placeholder="Or enter custom image URL"
                 className="w-full px-3.5 py-2 pl-9 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700 rounded-xl text-slate-900 dark:text-slate-100 placeholder-slate-400 text-xs focus:border-slate-500 focus:outline-hidden"
               />
               <Image className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
             </div>
+            {errors.coverImage && (
+              <p id="event-cover-error" className="mt-1 text-xs text-rose-500">{errors.coverImage}</p>
+            )}
           </div>
 
           {/* Description */}
@@ -392,6 +406,7 @@ export const EventModal: React.FC<EventModalProps> = ({
             <textarea
               id="event-description-input"
               rows={2}
+              maxLength={1000}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Atmosphere, special milestones, or vision for the celebration..."
@@ -407,6 +422,7 @@ export const EventModal: React.FC<EventModalProps> = ({
             <textarea
               id="event-notes-input"
               rows={2}
+              maxLength={2000}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Vendor contacts, run of show details, or secret surprises..."
